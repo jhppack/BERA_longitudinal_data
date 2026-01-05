@@ -1,0 +1,128 @@
+model {
+  ## ---------------------------------------------------------------------------
+  ## Model: Bayesian Extended Redundancy Analysis (ERA) for Longitudinal Data
+  ## ---------------------------------------------------------------------------
+  ## Description:
+  ##   This model extends the Bayesian ERA (Park et al., 2019) to longitudinal 
+  ##   panel data. It allows for time-varying intercepts while assuming constant 
+  ##   regression coefficients and residual covariance structures across time points.
+  ##
+  ## Reference: 
+  ##   Choi, J., et al. (2019). Bayesian Extended Redundancy Analysis: A Bayesian Approach 
+  ##   to Component-based Regression with Dimension Reduction, Multivariate Behavioral Research.
+  ##   doi: 10.1080/00273171.2019.1598837
+  ##
+  ## Key Assumptions:
+  ##   1. Random effects are independent.
+  ##   2. Missing outcome values are handled under the Missing At Random (MAR) assumption.
+  ##   3. The residual covariance structure at each time point follows a 
+  ##      factor analysis specification.
+  ## ---------------------------------------------------------------------------
+
+  ## ---------------------------------------------------------------------------
+  ## Data Input Specification (Provide as a list in R)
+  ## ---------------------------------------------------------------------------
+  ## Dimensions:
+  ##   N : Number of subjects
+  ##   Q : Number of outcomes
+  ##   K : Number of latent components
+  ##   T : Number of time points (waves)
+  ##   P : Number of predictors (implied by X columns)
+  ##
+  ## Data Arrays:
+  ##   Y : N x Q x T array of outcomes
+  ##   X : N x P x T array of predictors
+  ##
+  ## Hyperparameters & Indices:
+  ##   m_b    : (T+K) vector; Prior means for regression coefficients (including intercepts)
+  ##   S_b    : (T+K) x (T+K) matrix; Prior covariance for regression coefficients
+  ##   m_w    : Prior mean vector for component weights (Ws) and loadings (Ls)
+  ##   S_w    : Prior covariance matrix for component weights (Ws) and loadings (Ls)
+  ##   ind.W1 : Vector of indices for predictors contributing to Component 1
+  ##   ind.W2 : Vector of indices for predictors contributing to Component 2
+  ##   n.W1   : Integer; Length of ind.W1
+  ##   n.W2   : Integer; Length of ind.W2
+  ##   W.a    : Vector of constants used to fix the first element of each component 
+  ##            for identifiability
+  ## ---------------------------------------------------------------------------
+
+  ## Likelihood
+  for (i in 1:N) {
+    for (tm in 1:T) {
+      for (q in 1:Q) {
+        # Outcome model
+        Y[i, q, tm] ~ dnorm(mu[i, q, tm], tau.y[q])
+        
+        # Mean structure:
+        # Intercepts + (Predictors * Component Weights) * (Slope + Random Effects) + Residual Factor
+        # Note: 'Ws' constructs the latent components from predictors 'X'
+        mu[i, q, tm] <- c(1, X[i, , tm] %*% Ws) %*% 
+                        (c(Bt0[tm, q], Beta[, q]) + u[i, 1:(K+1), q]) + 
+                        Ls[q] * v[i]
+      }
+    }
+  }
+
+  ## Priors
+
+  # 1. Regression Coefficients (Intercepts and Slopes)
+  for (q in 1:Q) {
+    Betas[1:(T+K), q] ~ dmnorm(m_b[1:(T+K)], S_b[1:(T+K), 1:(T+K)])
+    
+    # Decompose Betas into time-varying intercepts and constant slopes
+    Bt0[1:T, q]  <- Betas[1:T, q]            # Time-varying intercepts
+    Beta[1:K, q] <- Betas[(T+1):(T+K), q]    # Component effects (Slopes)
+  }
+
+  # 2. Subject-Specific Random Effects on Regression Coefficients
+  for (q in 1:Q) {
+    for (j in 1:(K+1)) {
+      for (i in 1:N) {
+        u[i, j, q] ~ dnorm(0, tau.u[j, q])
+      }
+      tau.u[j, q]  <- pow(sig.u[j, q], -2)
+      sig2.u[j, q] <- pow(sig.u[j, q], 2)
+      sig.u[j, q]  ~ dunif(0, 15)
+    }
+  }
+
+  # 3. Subject-Specific Latent Factor (Residual Covariance)
+  for (i in 1:N) {
+    v[i] ~ dnorm(0, tau.v)
+  }
+  tau.v  <- pow(sig.v, -2)
+  sig2.v <- pow(sig.v, 2)
+  sig.v  ~ dunif(0, 15)
+
+  # 4. Component Weight Matrix (Ws) Specification
+  # Note: First element of each component is fixed for identifiability.
+  
+  # Component 1
+  Ws[ind.W1[1], 1] <- W.a[1]
+  Ws[ind.W1[2:n.W1], 1] ~ dmnorm(m_w[1:(n.W1-1)], S_w[1:(n.W1-1), 1:(n.W1-1)])
+  
+  # Component 2
+  Ws[ind.W2, 1] <- rep(0, n.W2)
+  Ws[ind.W2[1], 2] <- W.a[2]  # Typically 1; set to 0.5 for specific simulation scenarios.
+  Ws[ind.W2[2:n.W2], 2] ~ dmnorm(m_w[1:(n.W2-1)], S_w[1:(n.W2-1), 1:(n.W2-1)])
+  
+  # Zero-constraints for non-contributing predictors
+  Ws[ind.W1, 2] <- rep(0, n.W1)
+
+  # 5. Factor Loadings (Ls) for Residual Covariance
+  Ls[1] <- 1
+  Ls[2:Q] ~ dmnorm(m_w[2:Q], S_w[2:Q, 2:Q])
+
+  # 6. Residual Variance and Covariance Reconstruction
+  for (q in 1:Q) {
+    tau.y[q]  <- pow(sig.y[q], -2)
+    sig2.y[q] <- pow(sig.y[q], 2) + Ls[q]^2 * sig2.v
+    sig.y[q]  ~ dunif(0, 15)
+    
+    # Reconstructed covariance (off-diagonal elements represent shared residual variance)
+    Cov.y[q, 1:Q] <- Ls * Ls[q] * sig2.v
+  }
+
+  # Monitor: Non-zero weights for output analysis
+  Wss <- c(Ws[ind.W1[2:n.W1], 1], Ws[ind.W2[2:n.W2], 2])
+}
