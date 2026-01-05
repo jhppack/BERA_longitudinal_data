@@ -1,7 +1,7 @@
 @ -0,0 +1,40 @@
 # Bayesian Extended Redundancy Analysis for Longitudinal Data
 
-This repository contains the R code and JAGS model implementation for the **Bayesian Extended Redundancy Analysis (ERA)** adapted for **longitudinal (panel) data**.
+This repository contains the R code and JAGS model implementation for the **Bayesian Extended Redundancy Analysis (ERA)** adapted for **longitudinal data**.
 
 The code provided here **demonstrates** the simulation design and model estimation procedures presented in the manuscript tentatively titled:
 > *"Bayesian Extended Redundancy Analysis for Longitudinal Data"*
