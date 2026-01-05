@@ -8,7 +8,7 @@ The code provided here **demonstrates** the simulation design and model estimati
 
 ## Overview
 
-This project extends the original Bayesian ERA model (Park et al., 2019) to handle longitudinal data structures. The model is designed to analyze relationships between high-dimensional predictors and multiple outcomes over time, featuring:
+This project extends the original Bayesian ERA model (Choi et al., 2019) to handle longitudinal data structures. The model is designed to analyze relationships between high-dimensional predictors and multiple outcomes over time, featuring:
 
 * **Time-varying intercepts** to capture temporal trends.
 * **Time-invariant regression coefficients** for component stability.
@@ -18,8 +18,8 @@ This project extends the original Bayesian ERA model (Park et al., 2019) to hand
 
 ## Repository Contents
 
-* `BERA_Panel_model.txt`: The JAGS model specification file defining the likelihood, priors, and structural equations.
-* `simulation_script.R`: An R script that:
+* `BERA_longitudinal_model.txt`: The JAGS model specification file defining the likelihood and priors.
+* `simulation_code.R`: An R script that:
     1.  Generates synthetic longitudinal data based on the simulation design.
     2.  Prepares the data for JAGS.
     3.  Fits the model using the `R2jags` interface.
